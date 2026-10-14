@@ -6,25 +6,9 @@ The interface uses one reusable layout: a photograph, the child's name, and two 
 
 ## Current status
 
-This is a **visual prototype**. The page currently displays `sampleCard` from `main.js`. It does not yet read the CSV or select a child's photograph from the identity folder.
+The page now loads the CSV dynamically, finds the unique row matching the URL, and displays its name, telephone numbers, and photograph. GitHub Pages clean-path routing is handled by `404.html`, which redirects to the main page with a card parameter; the app then restores the clean URL without reloading.
 
-Implemented:
-
-- Persian right-to-left layout and locally bundled Vazir regular/bold fonts.
-- Responsive green card, blue name strip, and small KidsADA logo at the top-left.
-- Circular photograph area with a shimmer placeholder for absent or failed images.
-- Father and mother icons, large phone numbers, and full-row `tel:` links.
-- Accessible contact labels, keyboard focus outlines, and reduced-motion support.
-- Links to card requests, the KidsADA homepage, and support.
-- Sample identity data in CSV, with a separate photograph folder.
-
-Still to implement:
-
-- Record lookup based on the card URL.
-- Data loading and photo selection using the identity number.
-- Hosting-compatible routing for individual card URLs.
-- Unknown-card, inactive-card, and data-loading error states.
-- A private backend and protected storage for real records.
+The homepage asks visitors to open or scan a card link. Unknown cards and data-loading failures display a message without showing another child's information. Missing photographs retain the shimmer placeholder. This is a public static prototype, not a private backend.
 
 ## Project structure
 
@@ -32,7 +16,9 @@ Still to implement:
 kidsADA/
 ├── README.md
 ├── index.html                     # Page markup and asset-base handling
-├── main.js                        # Current sample data and card renderer
+├── main.js                        # CSV lookup and card renderer
+├── 404.html                       # GitHub Pages card-path fallback
+├── .nojekyll                      # Serve static files without Jekyll
 ├── assets/
 │   ├── styles.css                 # Layout, colors, fonts, and animation
 │   ├── README.md
@@ -69,22 +55,17 @@ Then open <http://localhost:8765/>. Stop the server with `Ctrl+C`.
 
 Using a local web server will also support the future data-fetching workflow. Python's basic static server does not provide fallback routing for card paths.
 
-## Edit the current preview
+## Open a card
 
-Change `sampleCard` in `main.js`:
+Example after uploading the updated files:
 
-```js
-const sampleCard = {
-  name: 'آرین نمونه',
-  photo: null,
-  father: '+12025550101',
-  mother: '+12025550102'
-};
-```
+<https://parviznarimani.github.io/kidsADA/pidp1112_keyp11112/>
 
-The numbers above are fictional demonstration numbers. Set `photo` to an existing relative image path, such as `kidsADA-data/faceimages/img000002.jpg`, to preview a photograph. Use `null` to keep the placeholder.
+The equivalent parameter URL also works:
 
-Phone numbers must be strings containing 7–15 ASCII digits with an optional leading `+`. A valid number becomes a `tel:` link, while the page displays its digits in Persian. Blank or invalid numbers remain non-callable placeholders. Tapping a valid row opens the device's telephone handler; the operating system controls any confirmation and the actual call.
+<https://parviznarimani.github.io/kidsADA/?card=pidp1112_keyp11112>
+
+Update the CSV and matching photographs to change card content. No JavaScript edits are needed for new records. Telephone rows use `tel:` links; the device controls dialing and any confirmation. Ten-digit Iranian mobile numbers beginning with 9 receive a leading 0 for dialing; numbers beginning with 989 and containing twelve digits receive a leading +. Other valid phone strings are preserved. Review the source numbers for correctness.
 
 ## Identity CSV
 
@@ -123,7 +104,7 @@ Photo path:   kidsADA-data/faceimages/img000002.jpg
 
 Do not add a second `img` prefix. Keep the capitalization and leading zeros identical. Use one photo per identity; JPEG is the convention used by the current files. Square portraits suit the circular crop best; the page uses `object-fit: cover`.
 
-Currently, images exist for `img000002` through `img000005`. No `img000001.jpg` has been supplied. When photo lookup is implemented, a missing image should show the existing placeholder.
+Currently, images exist for `img000002` through `img000005`. No `img000001.jpg` has been supplied. A missing image shows the existing placeholder. The loader tries jpg, jpeg, png, and webp, in that order.
 
 ## Intended card-opening flow
 
@@ -133,8 +114,6 @@ Currently, images exist for `img000002` through `img000005`. No `img000001.jpg` 
 4. The page displays the name, photo, and parent-contact links.
 
 For example, the CSV currently uses `pidp1111_keyp11111/` for its first record. This is different from the earlier illustrative token `pidp11111_keyp11111/`; use the exact stored value when connecting lookup.
-
-The current script recognizes the shape of a path token but does not use it for record lookup. Query-string lookup is also not implemented. Changing the URL or CSV today will not change the displayed sample card.
 
 ## GitHub Pages deployment
 
@@ -152,7 +131,7 @@ Expected main-page URL after successful deployment:
 
 See [GitHub's publishing-source documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
 
-GitHub Pages can serve the main static page, but an arbitrary URL such as `/kidsADA/pidp1111_keyp11111/` will not automatically resolve to `index.html`. Choose and implement a routing strategy before issuing card links. A query parameter can avoid static-host path routing, but requires corresponding lookup code; clean paths require supported routing or generated entry pages.
+Upload `404.html`, `.nojekyll`, `index.html`, `main.js`, `assets/`, and `kidsADA-data/` to the repository root. GitHub Pages initially returns a 404 response for a card path; the custom fallback redirects to the existing main page, which loads the record and restores the original clean path. Direct visits and refreshes both use this flow. JavaScript must be enabled. The initial 404 is expected in network logs.
 
 ## Data visibility
 
@@ -162,15 +141,13 @@ Use fictional demonstration records and appropriate sample images in this public
 
 ## Troubleshooting
 
-| Symptom | What to check |
-| --- | --- |
-| Main page returns 404 | Pages is enabled, the deployment succeeded, and `index.html` is at the selected publishing root. |
-| A card-specific path returns 404 | Token routing has not been implemented for this static host. |
-| CSV edits do not appear on the page | CSV lookup is not connected yet; the current preview uses `sampleCard`. |
-| Numbers edits are missing from the CSV | Export the Numbers table to CSV again. |
-| Photograph stays a placeholder | The current `photo` value is null, or its path cannot load; data-driven selection is not connected yet. |
-| Phone number cannot be dialed correctly | Restore the complete number as text, including the intended zero or country prefix. |
-| Fonts or icons fail to load | Preserve the `assets` folder paths and filename capitalization when uploading. |
+- Main page returns 404: verify Pages publishing settings and deployment status.
+- A card link stays on the fallback: ensure the latest `404.html` is at the publishing root and JavaScript is enabled.
+- Card not found: match the URL token exactly to `kidscard_url`; do not repeat the same card URL across rows.
+- Information could not load: check CSV availability, its five headers, matching field counts, and duplicate card URLs.
+- Photograph remains a placeholder: check the exact identity filename, lowercase extension, and successful upload.
+- Numbers edits do not appear: export to CSV, replace the repository's CSV, and wait for deployment.
+- Incorrect telephone dialing: verify complete source phone numbers, stored as text.
 
 ## Credits
 

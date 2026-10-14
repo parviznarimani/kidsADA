@@ -6,3 +6,5 @@
 .contact{justify-content:space-between;gap:12px}.icon{flex-shrink:0;width:52px;height:52px}.icon img{width:38px;height:38px}.number{font-size:clamp(24px,6.8vw,34px);font-weight:700;letter-spacing:0;direction:ltr}.details{flex:1;text-align:center}
 
 .card{position:relative}.brand-logo{position:absolute;top:16px;left:16px;width:76px;height:auto;object-fit:contain}@media(max-width:380px){.brand-logo{width:58px;top:14px;left:12px}}
+
+[hidden]{display:none!important}
