@@ -3,32 +3,7 @@ const skeleton = document.querySelector('.skeleton');
 const appBase = new URL('.', document.baseURI);
 const tokenPattern = /^pid[a-zA-Z0-9]+_key[a-zA-Z0-9]+$/;
 
-function parseCSV(text) {
-  const rows = []; let row = [], field = '', quoted = false;
-  text = text.replace(/^\uFEFF/, '');
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (c === '"') {
-      if (quoted && text[i + 1] === '"') { field += '"'; i++; }
-      else if (quoted || field === '') quoted = !quoted;
-      else throw new Error('Invalid CSV quoting');
-    } else if (c === ',' && !quoted) { row.push(field); field = ''; }
-    else if ((c === '\n' || c === '\r') && !quoted) {
-      if (c === '\r' && text[i + 1] === '\n') i++;
-      row.push(field); if (row.some(v => v.trim())) rows.push(row);
-      row = []; field = '';
-    } else field += c;
-  }
-  if (quoted) throw new Error('Unclosed CSV field');
-  row.push(field); if (row.some(v => v.trim())) rows.push(row);
-  const headers = rows.shift()?.map(v => v.trim());
-  const required = ['kidscard_url', 'kidsname', 'kids_identity_number', 'father_phone', 'mother_phone'];
-  if (!headers || new Set(headers).size !== headers.length || required.some(h => !headers.includes(h))) throw new Error('Missing CSV columns');
-  return rows.map(values => {
-    if (values.length !== headers.length) throw new Error('Invalid CSV row');
-    return Object.fromEntries(headers.map((h, i) => [h, values[i].trim()]));
-  });
-}
+const API_BASE = 'https://kidsada-admin.parviznarimani91.workers.dev';
 
 function normalizePhone(value) {
   let number = value.replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
@@ -63,19 +38,11 @@ function renderCard(record) {
       link.querySelector('.number').textContent = number.replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
     }
   }
-  // Identifiers already contain the img prefix. Never prepend it twice.
-  const id = record.kids_identity_number;
-  if (!/^[a-zA-Z0-9_-]+$/.test(id)) return;
-  const extensions = ['jpg', 'jpeg', 'png', 'webp'];
-  let index = 0;
   photo.onload = () => { photo.hidden = false; skeleton.hidden = true; };
-  photo.onerror = () => {
-    if (++index < extensions.length) loadPhoto();
-    else { photo.hidden = true; skeleton.hidden = false; }
-  };
-  function loadPhoto() { photo.src = new URL(`kidsADA-data/faceimages/${id}.${extensions[index]}`, appBase).href; }
+  photo.onerror = () => { photo.hidden = true; skeleton.hidden = false; };
   photo.alt = `تصویر ${record.kidsname}`;
-  loadPhoto();
+  photo.src = record.photoURL;
+
 }
 
 async function initialize() {
@@ -94,13 +61,13 @@ async function initialize() {
   if (query.has('card')) history.replaceState(null, '', new URL(token + '/', appBase));
   setMessage('در حال دریافت اطلاعات…', 'لطفاً کمی صبر کنید.');
   try {
-    const response = await fetch(new URL('kidsADA-data/kids-identity.csv', appBase), { cache: 'no-store' });
-    if (!response.ok) throw new Error('CSV unavailable');
-    const records = parseCSV(await response.text());
-    const matches = records.filter(row => row.kidscard_url.replace(/^\/+|\/+$/g, '') === token);
-    if (matches.length === 0) { setMessage('کارت پیدا نشد', 'لینک این کارت در اطلاعات موجود نیست.'); return; }
-    if (matches.length !== 1 || !matches[0].kidsname) throw new Error('Ambiguous or incomplete card');
-    renderCard(matches[0]);
+    const endpoint = `${API_BASE}/api/card/${encodeURIComponent(token)}`;
+    const response = await fetch(endpoint, { cache: 'no-store', credentials: 'omit' });
+    if (response.status === 404) { setMessage('کارت پیدا نشد', 'لینک این کارت در اطلاعات موجود نیست.'); return; }
+    if (!response.ok) throw new Error('Card API unavailable');
+    const record = await response.json();
+    if (!record.kidsname || typeof record.father_phone !== 'string' || typeof record.mother_phone !== 'string') throw new Error('Invalid card response');
+    renderCard({...record, photoURL: endpoint + '/photo'});
   } catch (error) {
     setMessage('اطلاعات دریافت نشد', 'لطفاً اتصال اینترنت را بررسی کرده و صفحه را دوباره باز کنید.');
     console.error('Card loading failed:', error.message);
